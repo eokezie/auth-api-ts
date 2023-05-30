@@ -1,91 +1,78 @@
-import { 
-    prop, 
-    getModelForClass, 
-    modelOptions, 
+import {
+    getModelForClass,
+    modelOptions,
+    prop,
     Severity,
-    pre ,
-    DocumentType
-} from "@typegoose/typegoose";
-import { nanoid } from "nanoid";
-import argo2 from 'argon2';
-import log from "../utils/logger";
-
-@pre<User>("save", async function(){
-    if(!this.isModified("password")){
-        return
+    pre,
+    DocumentType,
+    index,
+  } from "@typegoose/typegoose";
+  import { nanoid } from "nanoid";
+  import argon2 from "argon2";
+  import log from "../utils/logger";
+  
+  export const privateFields = [
+    "password",
+    "__v",
+    "verificationCode",
+    "passwordResetCode",
+    "verified",
+  ];
+  
+  @pre<User>("save", async function () {
+    if (!this.isModified("password")) {
+      return;
     }
-
-    const hash = await argo2.hash(this.password)
-
+    const hash = await argon2.hash(this.password);
     this.password = hash;
+  
+    return;
+  })
 
-    return
-}) 
-
-@modelOptions({
+  /**This helps the search lookup a little quicker when
+   * finding Users by email address
+   */
+  @index({ email: 1 })
+  @modelOptions({
     schemaOptions: {
-        timestamps: true
+      timestamps: true,
     },
     options: {
-        allowMixed: Severity.ALLOW
-    }
-})
-
-export class User {
-    @prop(
-        {
-            lowercase: true,
-            required: true,
-            unique: true
-        }
-    )
-    email: string
-
-    @prop(
-        {
-            required: true
-        }
-    )
-    firstName: string
-
-    @prop(
-        {
-            required: true
-        }
-    )
-    lastName: string
-
-    @prop(
-        {
-            required: true
-        }
-    )
-    password: string
-
-    @prop(
-        {
-            required: true,
-            default: () => nanoid()
-        }
-    )
-    verificationCode: string
-
+      allowMixed: Severity.ALLOW,
+    },
+  })
+  export class User {
+    @prop({ lowercase: true, required: true, unique: true })
+    email: string;
+  
+    @prop({ required: true })
+    firstName: string;
+  
+    @prop({ required: true })
+    lastName: string;
+  
+    @prop({ required: true })
+    password: string;
+  
+    @prop({ required: true, default: () => nanoid() })
+    verificationCode: string;
+  
     @prop()
-    passwordResetCode: string | null
-
+    passwordResetCode: string | null;
+  
     @prop({ default: false })
-    verified: boolean
-
+    verified: boolean;
+  
     async validatePassword(this: DocumentType<User>, candidatePassword: string) {
-        try {
-            return await argo2.verify(this.password, candidatePassword)
-        } catch (error) {
-            log.error(error, "Could not validate password");
-            return false
-        }
+      try {
+        return await argon2.verify(this.password, candidatePassword);
+      } catch (e) {
+        log.error(e, "Could not validate password");
+        return false;
+      }
     }
-}
-
-const UserModel = getModelForClass(User)
-
-export default UserModel;
+  }
+  
+  const UserModel = getModelForClass(User);
+  
+  export default UserModel;
